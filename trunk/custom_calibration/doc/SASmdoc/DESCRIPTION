@@ -1,0 +1,10 @@
+Package: SASmdoc
+Type: Package
+Title: Dokumentation der SAS Makro Bibliothek Advanced Survey Statistics
+Version: 0.6
+Date: 2010-06-05
+Author: Boyko Amarov
+Maintainer: Boyko Amarov <boyko.amarov@gmail.com>
+Description: Eine Sammlung von Makros, die die Arbeit in dem Kurs Advanced Survey Statistics erleichern soll.
+License: GPL
+LazyLoad: yes
