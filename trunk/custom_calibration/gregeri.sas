@@ -1,6 +1,8 @@
 
 
-/* GREGeri: Impement Generalized Regression Estimation using a model formula... */
+/* GREGeri: Impement Generalized Regression Estimation using a model formula... 
+	Erste Versuche fuer ein Kaligbrationsmakro
+*/
 
 %macro gregeri(formula=,
 			   	design=,
