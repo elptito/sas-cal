@@ -1,3 +1,4 @@
+
 /*BEISPIELE*/
 
 /*Erzeugung von ein Datensatz Universe von library human_cap*/
@@ -57,7 +58,7 @@ options mprint;
 ODS OUTPUT statistics=HT_residuals;
 PROC SURVEYMEANS DATA=results SUM ;
   VAR residual_reg;
-  WEIGHT samplingweight;
+  WEIGHT wk;
 RUN;
 ODS OUTPUT CLOSE;
 
@@ -192,6 +193,7 @@ run;
      ,sampling_weight = SamplingWeight    /*Spalte Gewichte*/
      ,totals = totals2                    /*Datensatz mit Totals und x-ID*/
      ,strata = marital_status             /*Schichtung per marital_status*/
+     ,class = gender_cohort
      );
 /*****************************************ENDE BEISPIEL II************************************************************/
 
@@ -259,8 +261,54 @@ run;
 
 
 
+/*******************************************BEISPIEL PAKEKT SURVEY R****************************************************/
+PROC IMPORT DATAFILE="C:\Users\darek\Desktop\sas-cal_wc\greg in R\apiclus1.csv"
+DBMS=csv
+OUT=WORK.apiclus1;
+RUN;
+
+PROC IMPORT DATAFILE="C:\Users\darek\Desktop\sas-cal_wc\greg in R\apiclus2.csv"
+DBMS=csv
+OUT=WORK.apiclus2;
+RUN;
+
+
+data tot;
+input stype;
+datalines;
+4421
+755
+1018
+;
+run;
+
+
+%gregar(sample = apiclus1                      /*Stichprobe*/
+       ,y = enroll                               /*y-Variable*/
+       ,X = stype                               /*x-variablen*/
+       ,sampling_weight = pw                     /*Spalte Gewichte*/
+       ,totals = tot                             /*Datensatz mit Totals und x-ID*/
+       ,class = stype                            /*Auflistung von diskreten Variablen*/
+       ,name_frq=stype
+       ,replicate_method = jackknife 
+       );
+  
+
+
+ods trace on/ listing;
+ods output statistics=ht_residuals;
+proc surveymeans data=from_reg varmethod=jackknife(outweights=xxx) sum;
+  var residual_reg;
+  weight pw;
+run;
+ods output close;
+ods trace off;
 
 
 
-*ods trace on/ listing;
-*ods trace off;
+PROC SQL no print;
+  SELECT count(enroll) INTO : rep
+  FROM apiclus1;
+QUIT;
+
+%put &rep;
