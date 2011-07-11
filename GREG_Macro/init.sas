@@ -24,7 +24,9 @@
 
 libname survey "../data";
 
-options fmtsearch = (work fdz) mstored sasmstore = calmar;
+
+
+options fmtsearch = (work fdz) mstored sasmstore = sasuser;
 
 %include "./macrro_gregg.sas";                /*MACRO GREGAR*/
 %include "../CLAN/clan97_313.sas";

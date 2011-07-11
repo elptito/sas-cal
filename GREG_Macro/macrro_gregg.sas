@@ -21,9 +21,11 @@ option nofmterr;
            ,strata =                 /*Name der Schichtung-variable, wenn keine Schichtung vorliegt, dann leer lassen*/
            ,cluster =                /*Name der Cluster-variable, wenn keine Clusterung vorliegt, dann leer lassen*/
            ,noint = 1                /*Entscheidung zwischen Modell mit/ohne Intercept (1 = kein Intercept) */
-           );
+           ,replicate_method =
+           ,rep = 100
+           )  / minoperator;
 
-%local intercept;
+%local intercept strata_sql rep;
 %if &noint = 0 %then %let intercept = ;
 %else %let intercept = noint;
 
@@ -31,8 +33,58 @@ option nofmterr;
 /************************Prozedur für GREG *******************************/
 /*************************************************************************/
 /*-------proc survey reg, Berechnung von B_hat------------*/
+
+/*
+%IF &replicate_method = brr %THEN %DO;
+ODS OUTPUT ONEWAYFREQS=y;
+PROC FREQ DATA=&sample;
+TABLE &strata;
+RUN;
+ODS OUTPUT CLOSE;
+
+ODS OUTPUT onewayfreqs=yy;
+PROC FREQ DATA =y;
+TABLE table;
+RUN;
+ODS OUTPUT CLOSE;
+
+ODS OUTPUT summary=yyy;
+PROC MEANS DATA=yy sum;
+VAR frequency;
+RUN;
+ODS OUTPUT CLOSE;
+
+PROC SQL ;
+  SELECT * INTO : rep
+  FROM yyy;
+QUIT;
+%END;
+%ELSE %IF &replicate_method = jackknife %THEN %DO;
+PROC SQL ;
+  SELECT COUNT(&y) INTO : rep
+  FROM &sample;
+QUIT; */
+
+%if  %UPCASE(&replicate_method) eq JACKKNIFE %THEN
+  %DO;
+    %let rep_statement =;
+  %END;
+%ELSE
+  %DO;
+     %let rep_statement = %quote(rep = &rep);
+  %END;
+
 ODS OUTPUT PARAMETERESTIMATES=estimate INVXPX=inverse;
-PROC SURVEYREG DATA= &sample;
+PROC SURVEYREG DATA= &sample 
+
+  
+  %IF %UPCASE(&replicate_method) # (BRR, JACKKNIFE) %THEN
+    %DO;
+      VARMETHOD=&replicate_method(%unquote(&rep_statement) OUTWEIGHTS = &sample._&replicate_method)
+    %END;
+
+  ;
+  
   STRATA &strata;
   CLUSTER &cluster;
   CLASS  &class;
@@ -41,7 +93,6 @@ PROC SURVEYREG DATA= &sample;
   OUTPUT OUT=from_reg r=residual_reg p=predicted_reg;
 RUN;
 ODS OUTPUT CLOSE;
-
 
 /*Spalte Estimate wird beigehalten, Rest weggeschmissen*/
 DATA estimate;
