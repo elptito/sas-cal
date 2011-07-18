@@ -1,6 +1,6 @@
 
 /*BEISPIELE*/
-
+options mprint symbolgen;
 /*Erzeugung von ein Datensatz Universe von library human_cap*/
 data universe;
   set mysas.human_cap;
@@ -34,7 +34,7 @@ run;
 
 
 /*Stichprobe SAMPLE, gezogen aus dem Datensatz Univere*/
-proc surveyselect data=universe 
+proc surveyselect data=universe noprint
                   out=sample	 
                   method=SRS
                   sampsize=1000
@@ -42,21 +42,21 @@ proc surveyselect data=universe
    
 run;
 
-options mprint;
+
 /*Macro wird aufgerufen - Model: earnings= gender_cohort + marital_status*/
 %gregar(sample = sample                     /*Stichprobe*/
-     ,y = earnings                          /*y-Variable*/
-     ,X =  gender_cohort marital_status     /*x-variablen*/
-     ,sampling_weight = SamplingWeight      /*Spalte Gewichte*/
-     ,totals = totals1                      /*Datensatz mit Totals und x-ID*/
-     ,class = gender_cohort marital_status  /*Auflistung von diskrete Varibalen*/
-     );
+       ,y = earnings                          /*y-Variable*/
+       ,X =  gender_cohort marital_status     /*x-variablen*/
+       ,sampling_weight = SamplingWeight      /*Spalte Gewichte*/
+       ,totals = totals1                      /*Datensatz mit Totals und x-ID*/
+       ,class = gender_cohort marital_status  /*Auflistung von diskrete Varibalen*/
+       );
 
 
 
 /*--------Berechnung von std. Fehler-----------*/
 ODS OUTPUT statistics=HT_residuals;
-PROC SURVEYMEANS DATA=results SUM ;
+PROC SURVEYMEANS DATA=results SUM;
   VAR residual_reg;
   WEIGHT wk;
 RUN;
@@ -290,10 +290,9 @@ run;
        ,totals = tot                             /*Datensatz mit Totals und x-ID*/
        ,class = stype                            /*Auflistung von diskreten Variablen*/
        ,name_frq=stype
-       ,replicate_method = jackknife 
+       ,replicate_method = jackknife
        );
   
-
 
 ods trace on/ listing;
 ods output statistics=ht_residuals;
@@ -304,11 +303,3 @@ run;
 ods output close;
 ods trace off;
 
-
-
-PROC SQL no print;
-  SELECT count(enroll) INTO : rep
-  FROM apiclus1;
-QUIT;
-
-%put &rep;
