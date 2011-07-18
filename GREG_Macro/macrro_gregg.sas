@@ -10,22 +10,23 @@
 
 option nofmterr;
 /*Macro greg wird implementiert, Eingaben werden deklariert*/
-%MACRO gregar(sample =               /*Datensatz Stichprobe, muss folgende Spalten beinhalten: y, x1, x2,..., Gewichte*/
-           ,y =                      /*Name der y-Spalte/Variable*/ 
-           ,X =                      /*Beschreibung des Modells*/
-           ,class=                   /*Wenn die deskrete Variable in Modell vorkommen, müssen die hier aufgelistet werden */
-           ,sampling_weight =        /*Name der Gewichten-Spalte*/
-           ,totals =                 /*Datensatz mit x-totals, Totals müssen in eine Spalte, als "Vektor", gespeicher werden, Reihenfolge: x1, x2, x3, ...
-                                       Für den Fall eine Regression mit Intercept, kommt als erstes der Gesamtzahl der Population ("Total" für Intercept)*/
-           ,name_frq = frequency     /*Name der Spalte mit x-totals muss angegeben werden, default = frequency*/
-           ,strata =                 /*Name der Schichtung-variable, wenn keine Schichtung vorliegt, dann leer lassen*/
-           ,cluster =                /*Name der Cluster-variable, wenn keine Clusterung vorliegt, dann leer lassen*/
-           ,noint = 1                /*Entscheidung zwischen Modell mit/ohne Intercept (1 = kein Intercept) */
-           ,replicate_method =
-           ,rep = 100
-           )  / minoperator;
+%MACRO gregar(sample =                 /*Datensatz Stichprobe, muss folgende Spalten beinhalten: y, x1, x2,..., Gewichte*/
+             ,y =                      /*Name der y-Spalte/Variable*/ 
+             ,X =                      /*Beschreibung des Modells*/
+             ,class =                  /*Wenn die deskrete Variable in Modell vorkommen, müssen die hier aufgelistet werden */
+             ,sampling_weight =        /*Name der Gewichten-Spalte*/
+             ,totals =                 /*Datensatz mit x-totals, Totals müssen in eine Spalte gespeicher werden, Reihenfolge: x1, x2, x3, ...
+                                         Für den Fall eine Regression mit Intercept, kommt als erstes der Gesamtzahl der Population ("Total" für Intercept)*/
+             ,name_frq = frequency     /*Name der Spalte mit x-totals muss angegeben werden, default = frequency*/
+             ,strata =                 /*Name der Schichtung-variable, wenn keine Schichtung vorliegt, dann leer lassen*/
+             ,cluster =                /*Name der Cluster-variable, wenn keine Clusterung vorliegt, dann leer lassen*/
+             ,noint = 1                /*Entscheidung zwischen Modell mit/ohne Intercept (1 = kein Intercept) */
+             ,replicate_method = null  /*default NULL*/
+             ,rep = 100
+             ,results_name = results
+             )  / minoperator;
 
-%local intercept strata_sql rep;
+%local intercept rep_statement;
 %if &noint = 0 %then %let intercept = ;
 %else %let intercept = noint;
 
@@ -34,57 +35,31 @@ option nofmterr;
 /*************************************************************************/
 /*-------proc survey reg, Berechnung von B_hat------------*/
 
-/*
-%IF &replicate_method = brr %THEN %DO;
-ODS OUTPUT ONEWAYFREQS=y;
-PROC FREQ DATA=&sample;
-TABLE &strata;
-RUN;
-ODS OUTPUT CLOSE;
 
-ODS OUTPUT onewayfreqs=yy;
-PROC FREQ DATA =y;
-TABLE table;
-RUN;
-ODS OUTPUT CLOSE;
-
-ODS OUTPUT summary=yyy;
-PROC MEANS DATA=yy sum;
-VAR frequency;
-RUN;
-ODS OUTPUT CLOSE;
-
-PROC SQL ;
-  SELECT * INTO : rep
-  FROM yyy;
-QUIT;
-%END;
-%ELSE %IF &replicate_method = jackknife %THEN %DO;
-PROC SQL ;
-  SELECT COUNT(&y) INTO : rep
-  FROM &sample;
-QUIT; */
-
-%if  %UPCASE(&replicate_method) eq JACKKNIFE %THEN
-  %DO;
+%if  %upcase(&replicate_method) eq JACKKNIFE %then
+  %do;
     %let rep_statement =;
-  %END;
-%ELSE
-  %DO;
+  %end;
+%else
+  %do;
      %let rep_statement = %quote(rep = &rep);
-  %END;
+ %end;
 
+DATA _sample;
+  SET &sample;
+  KEEP &y &x &strata &cluster &sampling_weight;
+RUN;
+
+
+
+ODS LISTING CLOSE;
 ODS OUTPUT PARAMETERESTIMATES=estimate INVXPX=inverse;
-PROC SURVEYREG DATA= &sample 
-
-  
-  %IF %UPCASE(&replicate_method) # (BRR, JACKKNIFE) %THEN
-    %DO;
+PROC SURVEYREG DATA= _sample 
+  %if %upcase(&replicate_method) # (BRR, JACKKNIFE) %then
+    %do;
       VARMETHOD=&replicate_method(%unquote(&rep_statement) OUTWEIGHTS = &sample._&replicate_method)
-    %END;
-
+    %end;
   ;
-  
   STRATA &strata;
   CLUSTER &cluster;
   CLASS  &class;
@@ -93,28 +68,19 @@ PROC SURVEYREG DATA= &sample
   OUTPUT OUT=from_reg r=residual_reg p=predicted_reg;
 RUN;
 ODS OUTPUT CLOSE;
+ODS LISTING;
 
-/*Spalte Estimate wird beigehalten, Rest weggeschmissen*/
+
+
+
+/*Spalte Estimate wird beibehalten, Rest weggeschmissen*/
 DATA estimate;
   SET estimate;
   KEEP estimate parameter; 
 RUN;
 
 
-/*Berechnungvon y_hat=B*x */
-DATA y_hat;
-  MERGE estimate &totals;
-  y_hat=&name_frq*estimate;
-  KEEP y_hat ;
-RUN;
 
-
-/*Berechnung von t_x'*B_hat= sum(y_hat)*/
-ODS OUTPUT summary = y_hat_sum ;  
-PROC MEANS DATA= y_hat SUM;
-  VAR y_hat;
-RUN;
-ODS OUTPUT CLOSE;
 
 
 /*--------GREG IML, Berechnung von w_k------------*/
@@ -135,6 +101,7 @@ PROC IML;
   USE design_x;
   READ all INTO x;
   USE &sample;
+  
   READ all VAR {&sampling_weight} INTO weight;
 
   tot= x#weight;
@@ -142,9 +109,10 @@ PROC IML;
 
 	correction = poptotal - t_pi_estimate;
   lambda= XWXginv*correction;
-	g = 1+x*lambda ;
-  w = g#weight;
 
+	g = 1+x*lambda;
+
+  w = g#weight;
   a= w||g;
 
 	CREATE weight FROM a; 
@@ -152,11 +120,32 @@ PROC IML;
 QUIT;
 
 
-DATA results;
-  MERGE from_reg weight(rename = (COL1 = wk COL2 = gk));
-  res_gk = gk*residual_reg;
-  KEEP residual_reg wk gk res_gk SamplingWeight;
-RUN;
+%if %upcase(&replicate_method) # (BRR, JACKKNIFE) %then %do;
+    DATA &sample._&replicate_method;
+     SET &sample._&replicate_method;
+     DROP &y &x &strata &cluster &sampling_weight;
+    RUN;
+
+    DATA &results_name;
+      MERGE &sample from_reg(KEEP = predicted_reg residual_reg) weight(rename = (COL1 = wk COL2 = gk)) &sample._&replicate_method;
+     res_gk = gk*residual_reg;
+    RUN;
+
+ %end;
+ %else %do;
+   DATA &results_name;
+    MERGE &sample from_reg(KEEP = predicted_reg residual_reg) weight(rename = (COL1 = wk COL2 = gk));
+    res_gk = gk*residual_reg;
+  RUN;
+%end;
+  
+
+/*
+PROC DATASETS LIBRARY = work;
+    DELETE Design_x From_reg y_hat inverse  weight from_reg _sample ;
+  RUN;
+QUIT;
+*/
 
 
 /*--------Berechnung von std. Fehler-----------*/
