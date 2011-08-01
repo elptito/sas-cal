@@ -5,7 +5,6 @@
   GREG Schätzer (Form: alpha + B_1*x_1 + B_2*x_2+ ... + = y).
   Datensatz mit B_1, B_2,... wird bestimmt und unter ESIMATE gespeichert.
   Datensatz mit Gewichte, Residuen, g_k, w_k, w_k*Residuum wird bestimmt und unter RESULTS gespeichert.
-  Datensatz mit total_y wird bestimmt und unter y_hat_sum gespeichert.
 */
 
 option nofmterr;
@@ -20,10 +19,10 @@ option nofmterr;
              ,name_frq = frequency     /*Name der Spalte mit x-totals muss angegeben werden, default = frequency*/
              ,strata =                 /*Name der Schichtung-variable, wenn keine Schichtung vorliegt, dann leer lassen*/
              ,cluster =                /*Name der Cluster-variable, wenn keine Clusterung vorliegt, dann leer lassen*/
-             ,noint = 1                /*Entscheidung zwischen Modell mit/ohne Intercept (1 = kein Intercept) */
-             ,replicate_method = null  /*default NULL*/
-             ,rep = 100
-             ,results_name = results
+             ,noint = 1                /*Entscheidung zwischen Modell mit/ohne Intercept (default 1 = kein Intercept) */
+             ,replicate_method = null  /*optionale Methode für Berechnung von Gewichten. Wahl zwischen BRR und Jackknife. default NULL*/
+             ,rep = 100                /*Anzahl Wiederholungen für Methode BRR, default 100*/
+             ,results_name = results   /*Name der Datei mit Ergebnisse, default results*/
              )  / minoperator;
 
 %local intercept rep_statement;
@@ -51,7 +50,7 @@ DATA _sample;
 RUN;
 
 
-
+/*Prozedur survey reg*/
 ODS LISTING CLOSE;
 ODS OUTPUT PARAMETERESTIMATES=estimate INVXPX=inverse;
 PROC SURVEYREG DATA= _sample 
@@ -71,8 +70,6 @@ ODS OUTPUT CLOSE;
 ODS LISTING;
 
 
-
-
 /*Spalte Estimate wird beibehalten, Rest weggeschmissen*/
 DATA estimate;
   SET estimate;
@@ -80,11 +77,7 @@ DATA estimate;
 RUN;
 
 
-
-
-
 /*--------GREG IML, Berechnung von w_k------------*/
-
 /*Erzeugung von Designmatrix*/
 PROC LOGISTIC DATA = &sample OUTDESIGN = design_x(DROP = &y) OUTDESIGNONLY NOPRINT;
 		CLASS &class  / PARAM = glm ORDER = internal;
@@ -140,12 +133,12 @@ QUIT;
 %end;
   
 
-/*
+
 PROC DATASETS LIBRARY = work;
     DELETE Design_x From_reg y_hat inverse  weight from_reg _sample ;
   RUN;
 QUIT;
-*/
+
 
 
 /*--------Berechnung von std. Fehler-----------*/

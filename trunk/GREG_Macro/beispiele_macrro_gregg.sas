@@ -1,7 +1,7 @@
 
-/*BEISPIELE*/
+/*BEISPIELE FÜR MACRO GREGAR*/
 options mprint symbolgen;
-/*Erzeugung von ein Datensatz Universe von library human_cap*/
+/*Erzeugung von ein Datensatz Universe von library human_cap, damit werden die Beispiele gerechnet*/
 data universe;
   set mysas.human_cap;
   if svyyear=2000;                            * only observartions from 2000;
@@ -17,7 +17,8 @@ data universe;
 
 
 /*******************************BEISPIEL I*********************************************************************/
-/*Datensatz TOTALS1, mit Hilfe von PROC FREQ werden die Totals von Datensatz Universe bestimmt*/
+
+ /*Datensatz TOTALS1, mit Hilfe von PROC FREQ werden die Totals von Datensatz Universe bestimmt*/
 ods output onewayfreqs=totals1 ;
 proc freq data=universe;
   table  gender_cohort marital_status;
@@ -25,7 +26,7 @@ run;
 ods output close;
 
 
-/*alle Totals werden als eine Spalte gespeichert, NOTWENDIG FÜR GREG-MACRO!*/
+/*alle Totals werden als eine Spalte gespeichert, NOTWENDIG FÜR UNSER MACRO!*/
 data totals1;
   set totals1;
   x_ID= coalesce(gender_cohort, marital_status);
@@ -44,7 +45,7 @@ run;
 
 
 /*Macro wird aufgerufen - Model: earnings= gender_cohort + marital_status*/
-%gregar(sample = sample                     /*Stichprobe*/
+%gregar(sample = sample                       /*Stichprobe*/
        ,y = earnings                          /*y-Variable*/
        ,X =  gender_cohort marital_status     /*x-variablen*/
        ,sampling_weight = SamplingWeight      /*Spalte Gewichte*/
@@ -53,8 +54,8 @@ run;
        );
 
 
-
-/*--------Berechnung von std. Fehler-----------*/
+/*Paar Berechnungen mit den Ausgaben von macro gregar*/
+/*--------Berechnung von std. Fehler---------------*/
 ODS OUTPUT statistics=HT_residuals;
 PROC SURVEYMEANS DATA=results SUM;
   VAR residual_reg;
@@ -62,23 +63,21 @@ PROC SURVEYMEANS DATA=results SUM;
 RUN;
 ODS OUTPUT CLOSE;
 
-/*---------------------GREG-------------------*/
+/*------------Berechnung von t_y_hat---------------*/
+DATA y_hat_sum ;
+  merge estimate Totals1;
+  t + estimate*Frequency;
+  keep t ;
+  if estimate = 0 then output;
+run;
+
+/*---------------------GREG- Schätzer-------------------*/
 DATA greg;
   MERGE y_hat_sum ht_residuals ;
-  t_greg=y_hat_sum+sum ;
+  t_greg=t+sum ;
   std_Greg=stddev ;
   KEEP T_Greg std_greg;
 RUN; 
-
-
-/*Ausgabe GREG-Schätzer und standard Fehler*/
-TITLE "GREG REGRESSION";
-PROC REPORT DATA=greg
-            NOWINDOWS HEADLINE;
-  DEFINE t_greg / 'Total Value' WIDTH=11;
-  DEFINE std_Greg / 'Std.Dev.';
-RUN; 
-
 
 /****************************ENDE BEISPIEL I**********************************************************************/
 
@@ -86,7 +85,8 @@ RUN;
 
 /*******************************BEISPIEL Ia -stetige Variable******************************************************/
 
-ods output summary=totals1a ;                /*Vektor TOTALS für stetige variable born*/
+/*Vektor TOTALS1a für stetige variable born, Summe von Born*/
+ods output summary=totals1a ;                
 proc means data=universe sum;
   var born;
 run;
@@ -103,15 +103,11 @@ ods output close;
 
 
 
+
 /*******************************BEISPIEL Ib - stetige und diskrete Variablen***************************************/
 
-ods output summary=totals1a ;
-proc means data=universe sum;
-  var born;
-run;
-ods output close;
-
-data totals1b;                                   /*Vektor TOTALS für Variablen born, gender_cohort, marital_status */                                 
+/*Vektor TOTALS1b, TOTALS1Aa und TOTALS als ein Datensatz*/  
+data totals1b;                                                                  
   set  totals1a totals1;
   frequency= coalesce(frequency, born_Sum);
   keep frequency Table x_ID;
@@ -130,12 +126,14 @@ run;
 
 /*******************************BEISPIEL Ic - Regression mit Intercept********************************************/
 
+/*Population Große, als "TOTAL" für intercept*/
 DATA count;
   frequency = 13119;
 RUN;
 
 
-data totals1c;                                   /*Vektor TOTALS für intercept. gender_cohort, marital_status */                                 
+/*Vektor TOTALS1c für intercept. gender_cohort, marital_status */ 
+data totals1c;                                                                   
   set  count totals1;
   keep frequency table x_ID;
 run;
@@ -155,6 +153,7 @@ run;
 
 
 /************************************BEISPIEL II - mit strata*****************************************************/
+
 /*Erzeugung von ein Datensatz universe2 = sortierte nach merital_status universe, notwengig für Stichprobeziehen mit Schichten*/
 proc sort data=universe
   out=universe2;
@@ -200,7 +199,9 @@ run;
 
 
 /*************************************BEISPIEL III - mit cluster******************************+***********************/
+
 /*Erzeugung von ein Datensatz SAMPLE3 mit clustern marital_status = 1 und 2*/
+/*neue Universe mit Cluster*/
 data universe3_temp;
   set universe ;
   if marital_status = 1 or marital_status = 2;
@@ -216,7 +217,7 @@ proc surveyselect data=universe
                   out=gewichte	 
                   method=SRS
                   stats  
-                  sampsize=11714;              * stats generates weights;
+                  sampsize=11714;             ;
 run; 
 
 DATA gewichte;
@@ -254,6 +255,7 @@ run;
      ,sampling_weight = SamplingWeight    /*Spalte Gewichte*/
      ,totals = totals3                    /*Datensatz mit Totals und x-ID*/                          
      ,cluster = marital_status
+     ,class = gender_cohort
      );
 
 /*********************************************ENDE BEISPIEL III*********************************************************/
@@ -261,7 +263,10 @@ run;
 
 
 
-/*******************************************BEISPIEL PAKEKT SURVEY R****************************************************/
+/***************************************BEISPIEL PAKEKT SURVEY R****************************************************/
+/*Vergleich mit den Ergebnisse aus R Paket SURVEY*/
+
+/*Datensatz Apiclus aus R*/
 PROC IMPORT DATAFILE="C:\Users\darek\Desktop\sas-cal_wc\greg in R\apiclus1.csv"
 DBMS=csv
 OUT=WORK.apiclus1;
@@ -283,23 +288,23 @@ datalines;
 run;
 
 
-%gregar(sample = apiclus1                      /*Stichprobe*/
+%gregar(sample = apiclus1                        /*Stichprobe*/
        ,y = enroll                               /*y-Variable*/
-       ,X = stype                               /*x-variablen*/
+       ,X = stype                                /*x-variablen*/
        ,sampling_weight = pw                     /*Spalte Gewichte*/
        ,totals = tot                             /*Datensatz mit Totals und x-ID*/
        ,class = stype                            /*Auflistung von diskreten Variablen*/
-       ,name_frq=stype
-       ,replicate_method = jackknife
+       ,name_frq=stype                           /*Name der Spalte mit x-Totals*/
+       ,replicate_method = jackknife             /*Befehl um die Jackknife gewichte zu erzeugen*/
        );
   
 
-ods trace on/ listing;
+*ods trace on/ listing;
 ods output statistics=ht_residuals;
-proc surveymeans data=from_reg varmethod=jackknife(outweights=xxx) sum;
-  var residual_reg;
-  weight pw;
+proc surveymeans data=results mean;
+  var enroll;
+  weight wk;
 run;
 ods output close;
-ods trace off;
+*ods trace off;
 

@@ -3,7 +3,7 @@
   benchmark1.sas
   
   Author
-  Descr: Vergleich vom Cal-Makro mit CLAN (und CALMAR)
+  Descr: Vergleich vom Cal-Makro mit CLAN (und CALMAR). Gleiche Ergebnisse wie bei gregar macro
   
 **************/
 

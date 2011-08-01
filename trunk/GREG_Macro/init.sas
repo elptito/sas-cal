@@ -33,7 +33,6 @@ options fmtsearch = (work fdz) mstored sasmstore = sasuser;
 %include "../shared/utility_macros1.sas";
 %include "../shared/buildAuxData.sas";
 %include "../shared/parseModel.sas";
-%include "../shared/gregeri.sas";
 %include "../shared/vec_emu.sas";
 %include "../shared/interaction.sas";
 
